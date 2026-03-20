@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aura Fragrances | 10ml Premium Scents</title>
+   
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+
+    <style>
+        :root {
+            --primary: #0f172a; --accent: #64748b; --bg: #ffffff;
+            --danger: #ef4444; --whatsapp: #25d366; --gold: #b45309;
+            --success: #16a34a; --disabled: #cbd5e1;
+        }
+       
+        body { margin:0; font-family: 'Garamond', serif; background: var(--bg); color: #1e293b; line-height: 1.6; }
+       
+        .header-msg { background: #f8fafc; text-align: center; padding: 10px; font-size: 11px; letter-spacing: 1px; color: var(--accent); border-bottom: 1px solid #eee; }
+        .nav { display:flex; justify-content:center; gap:15px; padding:20px; border-bottom: 1px solid #eee; position: sticky; top:0; background:white; z-index:100; }
+        .nav button { background:none; border:none; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; cursor:pointer; color: var(--primary); font-weight: bold; }
+       
+        .page { display:none; max-width: 900px; margin: 0 auto; padding: 20px; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .container { display:grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; }
+        .card { border: 1px solid #f1f1f1; padding: 15px; text-align: center; background: #fff; border-radius: 4px; display: flex; flex-direction: column; justify-content: space-between; }
+        
+        /* NEW IMAGE LOGIC: Square and specific */
+        .card-img-container { width: 100%; aspect-ratio: 1/1; margin-bottom: 10px; overflow: hidden; border-radius: 2px; }
+        .card img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s; }
+        .card:hover img { transform: scale(1.05); }
+
+        .size-tag { font-size: 10px; color: var(--gold); font-weight: bold; text-transform: uppercase; display: block; margin-bottom: 5px; }
+        .scent-desc { font-size: 11px; font-style: italic; color: #64748b; display: block; margin-bottom: 8px; line-height: 1.2;}
+
+        .qty-controls { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 10px 0; }
+        .qty-btn { width: 32px; height: 32px; border: 1px solid #ddd; background: #fff; cursor: pointer; }
+        .qty-num { font-family: sans-serif; font-weight: bold; }
+
+        .btn { width: 100%; padding: 14px; background: var(--primary); color: white; border: none; cursor: pointer; text-transform: uppercase; font-size: 11px; letter-spacing: 2px; font-weight: bold; margin-top: 5px; }
+        .btn-online { background: #4f46e5; }
+       
+        .checkout-box { background: #fafafa; padding: 25px; border: 1px solid #eee; margin-top: 30px; border-radius: 8px; }
+        input, textarea { width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #ddd; box-sizing: border-box; border-radius: 4px; }
+       
+        .total-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+        .grand { font-size: 24px; font-weight: bold; border-top: 1px solid #000; padding-top: 15px; margin-top: 15px; }
+        .discount-line { color: var(--success); font-weight: bold; font-size: 13px; }
+
+        .order-item { background: white; border: 1px solid #e2e8f0; padding: 15px; margin-bottom: 15px; border-left: 5px solid var(--primary); text-align: left; font-size: 13px; }
+
+        /* Responsive Fix for Mobile */
+        @media (max-width: 480px) {
+            .container { 
+                grid-template-columns: 1fr 1fr; /* 2 Columns */
+                gap: 10px; 
+            }
+            .card { padding: 10px; }
+            .nav { padding: 15px 10px; gap: 8px; }
+            .nav button { font-size: 10px; letter-spacing: 1px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header-msg">✨ BUY 4 BOTTLES & SAVE ₹17 | 10ML (100 SPRAYS) PER BOTTLE</div>
+
+<div class="nav">
+    <button onclick="show('home')">Home</button>
+    <button onclick="show('shop')">Shop</button>
+    <button onclick="show('track')">Track</button>
+    <button onclick="show('admin-login')">Admin</button>
+</div>
+
+<div id="shop" class="page" style="display:block;">
+    <div class="container" id="productGrid"></div>
+   
+    <div class="checkout-box">
+        <h3>YOUR BAG</h3>
+        <div id="cartList" style="margin-bottom: 15px;"></div>
+       
+        <div class="total-row">Subtotal: <span id="subTotal">₹0</span></div>
+        <div id="dealRow" class="total-row discount-line" style="display: none;">
+            <span>Volume Discount (Buy 4 Save ₹17):</span> <span id="discountAmt"></span>
+        </div>
+        <div class="total-row">Shipping: <span id="shipFee">₹0</span></div>
+        <div class="total-row grand">Total: <span id="finalTotal">₹0</span></div>
+       
+        <h3 style="margin-top:30px;">DELIVERY DETAILS</h3>
+        <input type="text" id="custName" placeholder="Full Name *">
+        <input type="number" id="custPhone" placeholder="Mobile Number *">
+        <input type="number" id="pincode" placeholder="Pincode *" onkeyup="calcShip()">
+        <textarea id="custAddr" placeholder="Address with Landmark *" rows="3"></textarea>
+       
+        <label style="font-size: 11px; display: flex; align-items: flex-start; gap: 8px; margin-bottom: 15px;">
+            <input type="checkbox" id="termsCheck" style="width: auto; margin-top: 3px;">
+            <span>I agree to the Terms & Conditions. All fields are necessary for delivery.</span>
+        </label>
+
+        <button class="btn" onclick="placeOrder('COD')">Checkout (COD)</button>
+        <button class="btn btn-online" onclick="placeOrder('UPI')">Pay Online via UPI</button>
+    </div>
+</div>
+
+<div id="track" class="page" style="text-align:center;">
+    <h2>TRACK ORDER</h2>
+    <div class="checkout-box" style="max-width: 450px; margin: auto;">
+        <input type="text" id="trackID" placeholder="6-Digit ID">
+        <button class="btn" onclick="trackOrder()">Track Now</button>
+        <div id="trackRes" style="margin-top:20px; font-weight: bold; font-size: 20px; color: var(--gold);"></div>
+    </div>
+</div>
+
+<div id="admin-login" class="page">
+    <div class="checkout-box" style="max-width: 350px; margin: auto; text-align: center;">
+        <h2>Admin</h2>
+        <input type="text" id="adminUser" placeholder="User">
+        <input type="password" id="adminPass" placeholder="Pass">
+        <button class="btn" onclick="loginAdmin()">Login</button>
+    </div>
+</div>
+<div id="admin-panel" class="page">
+    <div style="display:flex; justify-content: space-between; align-items: center;">
+        <h2>Orders</h2>
+        <button class="btn" style="width: 80px; background: var(--danger);" onclick="location.reload()">Exit</button>
+    </div>
+    <div id="orderStream"></div>
+</div>
+
+<script>
+    // --- !!! CONFIGURATION REQUIRED !!! ---
+    const firebaseConfig = { apiKey: "YOUR_KEY", databaseURL: "https://YOUR_DB.firebaseio.com", projectId: "YOUR_ID" };
+    if(firebaseConfig.apiKey !== "YOUR_KEY") firebase.initializeApp(firebaseConfig);
+
+    const MY_PHONE = "7748022111"; // SMS recipient
+
+    // --- PRODUCT DEFINITIONS WITH DESCRIPTIONS ---
+    const products = [
+        {name:"Sweet Burst", price:99, desc:"Vanilla, Cotton Candy, Musk"}, 
+        {name:"Fresh Vibes", price:99, desc:"Citrus, Sea Salt, Bergamot"},
+        {name:"Green Apple", price:79, desc:"Crisp Apple, Green Leaves"}, 
+        {name:"Rose", price:79, desc:"Velvet Petals, Dewy Morning"},
+        {name:"Ocean", price:79, desc:"Breeze, Aquatics, Driftwood"}, 
+        {name:"Lavender", price:79, desc:"Calm Lavender, Herbal Notes"},
+        {name:"Sandalwood", price:79, desc:"Warm Wood, Creamy, Sandalwood"}, 
+        {name:"Lemongrass", price:79, desc:"Zesty, Herbaceous, Energy"},
+        {name:"Jasmine", price:79, desc:"Exotic Bloom, Sweet Jasmine"}, 
+        {name:"Vanilla", price:79, desc:"Vanilla Pod, Cream, Caramel"},
+        {name:"Mogra", price:79, desc:"Traditional Indian Jasmine"}, 
+        {name:"Fruit Scents", price:79, desc:"Mixed Berry, Summer Fruits"}
+    ];
+
+    let cart = {}; let shipping = 0;
+
+    function render() {
+        document.getElementById("productGrid").innerHTML = products.map(p => {
+            const qty = cart[p.name] ? cart[p.name].qty : 0;
+            // Generate distinct, label-focused images from Unsplash
+            const imgQuery = encodeURIComponent(`perfume bottle white label ${p.name}`);
+            
+            return `
+            <div class="card">
+                <div>
+                    <span class="size-tag">10ml | Premium</span>
+                    <div class="card-img-container">
+                        <img src="https://source.unsplash.com/400x400/?${imgQuery}" loading="lazy" alt="${p.name}">
+                    </div>
+                    <strong>${p.name}</strong>
+                    <span class="scent-desc">${p.desc}</span>
+                    <br>₹${p.price}
+                </div>
+                <div>
+                    <div class="qty-controls">
+                        <button class="qty-btn" onclick="changeQty('${p.name}', ${p.price}, -1)">-</button>
+                        <span class="qty-num">${qty}</span>
+                        <button class="qty-btn" onclick="changeQty('${p.name}', ${p.price}, 1)">+</button>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function changeQty(name, price, delta) {
+        if (!cart[name]) cart[name] = { price, qty: 0 };
+        cart[name].qty += delta;
+        if (cart[name].qty <= 0) delete cart[name];
+        render(); calcTotal();
+    }
+
+    function calcShip() {
+        let pin = document.getElementById("pincode").value;
+        if(pin.startsWith("457")) shipping = 30;
+        else if(pin.startsWith("45")) shipping = 35;
+        else shipping = pin === "" ? 0 : 65;
+        calcTotal();
+    }
+
+    function calcTotal() {
+        let sub = 0; let totalQty = 0; let html = "";
+        for (let name in cart) {
+            let itemTotal = cart[name].price * cart[name].qty;
+            sub += itemTotal;
+            totalQty += cart[name].qty;
+            html += `<div class="total-row"><span>${name} x${cart[name].qty}</span> <span>₹${itemTotal}</span></div>`;
+        }
+        document.getElementById("cartList").innerHTML = html || "Bag is empty";
+       
+        // DISCOUNT LOGIC: Every 4 bottles = ₹17 off (Premium Site Logic: applies to all)
+        let disc = Math.floor(totalQty / 4) * 17;
+       
+        const dealRow = document.getElementById("dealRow");
+        const subTotalSpan = document.getElementById("subTotal");
+
+        if (disc > 0) {
+            dealRow.style.display = "flex";
+            document.getElementById("discountAmt").innerText = "-₹" + disc;
+            subTotalSpan.style.textDecoration = "line-through";
+            subTotalSpan.style.color = "#888";
+        } else {
+            dealRow.style.display = "none";
+            subTotalSpan.style.textDecoration = "none";
+            subTotalSpan.style.color = "inherit";
+        }
+       
+        document.getElementById("subTotal").innerText = "₹" + sub;
+        document.getElementById("shipFee").innerText = "₹" + shipping;
+        
+        // Final total: Subtotal - Discount + Shipping
+        const finalAmt = sub - disc + shipping;
+        document.getElementById("finalTotal").innerText = "₹" + (finalAmt < 0 ? 0 : finalAmt);
+    }
+
+    function placeOrder(method) {
+        const name = document.getElementById("custName").value.trim();
+        const phone = document.getElementById("custPhone").value.trim();
+        const addr = document.getElementById("custAddr").value.trim();
+        const pin = document.getElementById("pincode").value.trim();
+        const checked = document.getElementById("termsCheck").checked;
+
+        if (!name || !phone || !addr || !pin || !checked) return alert("⚠️ Please fill all fields.");
+       
+        const id = Math.floor(100000 + Math.random() * 900000);
+        const totalRaw = document.getElementById("finalTotal").innerText.replace('₹','');
+        const items = Object.keys(cart).map(k => `${k} x${cart[k].qty}`).join(", ");
+       
+        const orderObj = { id, name, phone, addr, pincode: pin, total: "₹"+totalRaw, status: "Pending", items, time: new Date().toLocaleString() };
+        
+        // Write to Firebase
+        if(typeof firebase !== 'undefined') firebase.database().ref('aura_orders/' + id).set(orderObj);
+       
+        alert("✨ Order #${id} registered! Redirecting...");
+        navigator.clipboard.writeText(id.toString());
+
+        if(method === 'UPI') {
+            // Updated dynamic UPI with TN (Transaction Note)
+            window.location.href = `upi://pay?pa=7748022111@ybl&pn=AuraFragrances&am=${totalRaw}&cu=INR&tn=AuraOrder${id}`;
+        } else {
+            window.location.href = `sms:${MY_PHONE}?body=Aura Order #${id}: ₹${totalRaw} for ${name}. Items: ${items}`;
+        }
+    }
+
+    function trackOrder() {
+        let id = document.getElementById("trackID").value;
+        if(!id) return;
+        if(typeof firebase === 'undefined') return alert("Firebase not configured.");
+        
+        firebase.database().ref('aura_orders/' + id).once('value', s => {
+            document.getElementById("trackRes").innerText = s.exists() ? s.val().status.toUpperCase() : "NOT FOUND";
+        });
+    }
+
+    function loginAdmin() {
+        const u = document.getElementById("adminUser").value;
+        const p = document.getElementById("adminPass").value;
+        // Obscured password check: 'ntvtvtvnnnauraupgrade' encoded
+        const secretHash = "bnR2dHZ0dm5ubmF1cmF1cGdyYWRl"; 
+        
+        if(u === "Aurafragrancesntv" && btoa(p) === secretHash) { 
+            show('admin-panel'); 
+            loadOrders(); 
+        } else {
+            alert("Access Denied.");
+        }
+    }
+
+    function loadOrders() {
+        if(typeof firebase === 'undefined') return;
+        firebase.database().ref('aura_orders').on('value', snap => {
+            let html = "";
+            snap.forEach(child => {
+                let o = child.val();
+                html += `<div class="order-item">ID: #${o.id} | ${o.name} (${o.time})<br><strong>${o.total}</strong> - ${o.items}<br>Addr: ${o.addr}, ${o.pincode}<br>
+                <select onchange="upStatus('${o.id}', this.value)">
+                    <option ${o.status=='Pending'?'selected':''}>Pending</option>
+                    <option ${o.status=='Shipped'?'selected':''}>Shipped</option>
+                    <option ${o.status=='Delivered'?'selected':''}>Delivered</option>
+                </select></div>`;
+            });
+            document.getElementById("orderStream").innerHTML = html;
+        });
+    }
+
+    function upStatus(id, st) { if(typeof firebase !== 'undefined') firebase.database().ref('aura_orders/' + id).update({status: st}); }
+    function show(id) { document.querySelectorAll('.page').forEach(p => p.style.display = 'none'); document.getElementById(id).style.display = 'block'; }
+    
+    // Initial Render
+    render();
+</script>
+</body>
+</html>
